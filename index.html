@@ -39,6 +39,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-s
 
 .header { background: var(--white); border-bottom: 1px solid var(--border); padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
 .header-title { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+.back-btn { display: none; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: none; background: var(--bg2); color: var(--text); cursor: pointer; flex-shrink: 0; transition: background 0.15s, transform 0.1s; }
+.back-btn.show { display: flex; }
+.back-btn:active { transform: scale(0.92); background: var(--border2); }
 .month-selector { display: flex; align-items: center; gap: 8px; background: var(--bg2); border-radius: var(--radius-sm); padding: 6px 12px; cursor: pointer; border: none; font-family: inherit; }
 .month-selector span { font-size: 13px; font-weight: 500; }
 
@@ -157,6 +160,17 @@ html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-s
 .nb-amount { font-size: 15px; font-weight: 600; font-family: 'DM Mono', monospace; margin-top: 2px; }
 .nb-pct { font-size: 11px; color: var(--text3); }
 
+.budget-row { cursor: pointer; transition: background 0.1s; }
+.budget-row:active { background: var(--bg2); }
+.cat-chevron { color: var(--text3); transition: transform 0.2s; flex-shrink: 0; }
+.cat-chevron.open { transform: rotate(180deg); }
+.budget-subrow td { padding: 0 8px 12px !important; border-bottom: 1px solid var(--border); }
+.sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; animation: fadeIn 0.2s ease; }
+.sub-card { background: var(--bg2); border-radius: var(--radius-sm); padding: 9px 10px; }
+.sub-name { font-size: 11px; color: var(--text2); font-weight: 500; line-height: 1.25; min-height: 27px; display: flex; align-items: flex-start; }
+.sub-amount { font-size: 14px; font-weight: 600; font-family: 'DM Mono', monospace; margin-top: 2px; }
+.sub-pct { font-size: 10px; color: var(--text3); margin-top: 1px; }
+
 .anual-scroll { overflow-x: auto; }
 .anual-table { min-width: 700px; border-collapse: collapse; font-size: 12px; }
 .anual-table th { background: var(--bg2); padding: 8px 10px; text-align: right; font-weight: 500; color: var(--text2); border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -198,7 +212,10 @@ html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-s
 <div id="app">
 
   <div class="header">
-    <div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="back-btn" id="back-btn" onclick="goBack()" aria-label="Volver">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 4l-5 5 5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
       <div class="header-title">IF 2026</div>
     </div>
     <button class="month-selector" onclick="openMonthPicker()">
@@ -227,11 +244,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-s
       </div>
       <div class="card" style="margin-bottom:16px">
         <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px">Presupuesto por categoría</div>
-        <table class="budget-table"><thead><tr><th>Categoría</th><th>Obj.</th><th>Real</th><th></th></tr></thead><tbody id="budget-tbody"></tbody></table>
-      </div>
-      <div class="card" style="margin-bottom:16px">
-        <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px">Necesidades básicas</div>
-        <div class="nb-grid" id="nb-grid"></div>
+        <table class="budget-table"><thead><tr><th>Categoría</th><th>Objetivo</th><th>Real</th></tr></thead><tbody id="budget-tbody"></tbody></table>
       </div>
       <div class="section-title">Últimas transacciones</div>
       <div id="recent-tx"></div>
@@ -394,11 +407,11 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ===================== DATA MODEL =====================
 const EXPENSE_CATEGORIES = {
-  INVERSION:    { label: 'Inversión',       budget_pct: 10, color: '#4A7C6F', subcategories: ['Idea de negocio','Acciones','Criptomonedas'] },
+  INVERSION:    { label: 'Inversión',       budget_pct: 35, color: '#4A7C6F', subcategories: ['Idea de negocio','Acciones','Criptomonedas'] },
   EDUCACION:    { label: 'Educación',        budget_pct: 10, color: '#5B8DB8', subcategories: ['Libros','Cursos, seminarios, conferencias','Másters, estudios superiores','Coaching, asesoramiento'] },
-  DONACION:     { label: 'Donación',         budget_pct: 10, color: '#9B6B9E', subcategories: ['Contribución (benéfica, iglesia...)','Membresía de club','Regalos'] },
-  AHORRO:       { label: 'Ahorro',           budget_pct: 20, color: '#2E7D5A', subcategories: ['Cuenta de ahorros','Fondo de inversión, imposiciones'] },
-  ENTRETENIMIENTO: { label: 'Entretenimiento', budget_pct: 10, color: '#C07A2E', subcategories: ['Viajes','Discotecas','Estilo de vida - miscelánea','Otros deportes / nuevas actividades','Pádel','Restaurantes'] },
+  DONACION:     { label: 'Donación',         budget_pct: 5,  color: '#9B6B9E', subcategories: ['Contribución (benéfica, iglesia...)','Membresía de club','Regalos'] },
+  AHORRO:       { label: 'Ahorro',           budget_pct: 5,  color: '#2E7D5A', subcategories: ['Cuenta de ahorros','Fondo de inversión, imposiciones'] },
+  ENTRETENIMIENTO: { label: 'Entretenimiento', budget_pct: 15, color: '#C07A2E', subcategories: ['Viajes','Discotecas','Estilo de vida - miscelánea','Otros deportes / nuevas actividades','Pádel','Restaurantes'] },
   VIVIENDA:     { label: 'Vivienda',         parent: 'NB', color: '#7B8C9E', subcategories: ['IBI','Comunidad','Reparaciones en el hogar','Agua','Cosas para casa'] },
   ALIMENTACION: { label: 'Alimentación',     parent: 'NB', color: '#8B7355', subcategories: ['Frutería','Carnicería','Pescadería','Limpieza','Otros alimentación','Comidas fuera de casa'] },
   TRANSPORTE:   { label: 'Transporte',       parent: 'NB', color: '#6B8E6B', subcategories: ['LEON 150 TDI','ITV','Gasolina','Seguro','IVTM','Mantenimiento','Garaje','Reparaciones del coche','Multas','Transporte público / taxis'] },
@@ -507,7 +520,10 @@ function buildTxObj(data) {
 
 // ===================== NAVIGATION =====================
 let currentPage = 'dashboard';
-function navigate(page) {
+let navHistory = [];
+
+function navigate(page, isBack) {
+  if (!isBack && currentPage && currentPage !== page) navHistory.push(currentPage);
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
@@ -515,6 +531,7 @@ function navigate(page) {
   if (nav) nav.classList.add('active');
   currentPage = page;
   document.getElementById('more-menu').classList.remove('show');
+  updateBackBtn();
   if (page === 'dashboard') renderDashboard();
   if (page === 'historial') renderHistorial();
   if (page === 'recurrentes') renderRecurrentes();
@@ -522,11 +539,31 @@ function navigate(page) {
   if (page === 'anual') renderAnual();
   if (page === 'nuevo') { setDefaultDates(); document.getElementById('g-importe').value=''; document.getElementById('i-importe').value=''; }
 }
-function toggleMoreMenu() { document.getElementById('more-menu').classList.toggle('show'); }
+
+function anyModalOpen() { return document.querySelector('.modal-overlay.show'); }
+
+function updateBackBtn() {
+  const show = anyModalOpen() || currentPage !== 'dashboard' || navHistory.length > 0;
+  document.getElementById('back-btn').classList.toggle('show', !!show);
+}
+
+function goBack() {
+  // 1. Si hay un modal abierto, ciérralo
+  const modal = anyModalOpen();
+  if (modal) { modal.classList.remove('show'); state.currentTxId = null; updateBackBtn(); return; }
+  // 2. Si hay menú "más" abierto, ciérralo
+  const more = document.getElementById('more-menu');
+  if (more.classList.contains('show')) { more.classList.remove('show'); updateBackBtn(); return; }
+  // 3. Vuelve a la página anterior, o al dashboard
+  const prev = navHistory.pop() || 'dashboard';
+  navigate(prev, true);
+}
+
+function toggleMoreMenu() { document.getElementById('more-menu').classList.toggle('show'); updateBackBtn(); }
 
 // ===================== MONTH PICKER =====================
-function openMonthPicker() { state.pickerYear = state.currentYear; renderMonthGrid(); document.getElementById('month-modal').classList.add('show'); }
-function closeMonthPicker(e) { if (!e || e.target===document.getElementById('month-modal')) document.getElementById('month-modal').classList.remove('show'); }
+function openMonthPicker() { state.pickerYear = state.currentYear; renderMonthGrid(); document.getElementById('month-modal').classList.add('show'); updateBackBtn(); }
+function closeMonthPicker(e) { if (!e || e.target===document.getElementById('month-modal')) { document.getElementById('month-modal').classList.remove('show'); updateBackBtn(); } }
 function renderMonthGrid() {
   document.getElementById('picker-year').textContent = state.pickerYear;
   document.getElementById('month-grid').innerHTML = MONTHS_ES.map((m,i) => {
@@ -555,10 +592,12 @@ function renderDashboard() {
   const difEl = document.getElementById('m-diferencial');
   difEl.textContent = fmt(dif);
   difEl.className = 'metric-value ' + (dif>0?'positive':dif<0?'negative':'neutral');
-  const yearIngresos = yearTxs.filter(t=>t.type==='income').reduce((s,t)=>s+parseFloat(t.amount),0);
+  // Presupuesto basado en el ingreso del MES ANTERIOR
+  let prevMonth = state.currentMonth - 1, prevYear = state.currentYear;
+  if (prevMonth < 1) { prevMonth = 12; prevYear -= 1; }
+  const prevIngresos = state.allTxs.filter(t => t.type==='income' && t.month_number===prevMonth && t.year===prevYear).reduce((s,t)=>s+parseFloat(t.amount),0);
   renderDonut(monthTxs, gastos);
-  renderBudgetTable(monthTxs, yearIngresos);
-  renderNBGrid(monthTxs);
+  renderBudgetTable(monthTxs, prevIngresos);
   renderRecentTx(monthTxs);
 }
 
@@ -581,22 +620,73 @@ function renderDonut(txs, totalGastos) {
   document.getElementById('donut-legend').innerHTML = data.filter(d=>d.val>0).slice(0,5).map(d=>`<div class="legend-item"><div class="legend-dot" style="background:${d.color}"></div><span class="legend-name">${d.label}</span><span class="legend-val">${fmt(d.val)}</span></div>`).join('');
 }
 
-function renderBudgetTable(txs, yearIngresos) {
-  const monthBudget = yearIngresos / 12;
-  const rows = [...MAIN_CATS.map(k => { const cat=EXPENSE_CATEGORIES[k]; const real=txs.filter(t=>t.type==='expense'&&t.category===k).reduce((s,t)=>s+parseFloat(t.amount),0); return { label:cat.label, color:cat.color, pct:cat.budget_pct, real, budget:monthBudget*(cat.budget_pct/100) }; }),
-    (() => { const real=NB_KEYS.reduce((s,k)=>s+txs.filter(t=>t.type==='expense'&&t.category===k).reduce((ss,t)=>ss+parseFloat(t.amount),0),0); return { label:'Nec. básicas', color:'#7B8C9E', pct:40, real, budget:monthBudget*0.4 }; })()
+// Categorías expandidas (persiste durante la sesión)
+let expandedCats = {};
+
+function renderBudgetTable(txs, prevIngresos) {
+  const base = prevIngresos; // lo que puedes gastar este mes = ingreso del mes anterior
+  const rows = [
+    ...MAIN_CATS.map(k => {
+      const cat = EXPENSE_CATEGORIES[k];
+      const real = txs.filter(t=>t.type==='expense'&&t.category===k).reduce((s,t)=>s+parseFloat(t.amount),0);
+      // desglose por subcategoría
+      const subs = cat.subcategories.map(sub => ({
+        label: sub,
+        val: txs.filter(t=>t.type==='expense'&&t.category===k&&t.subcategory===sub).reduce((s,t)=>s+parseFloat(t.amount),0)
+      }));
+      return { key:k, label:cat.label, color:cat.color, pct:cat.budget_pct, real, budget:base*(cat.budget_pct/100), subs };
+    }),
+    (() => {
+      const real = NB_KEYS.reduce((s,k)=>s+txs.filter(t=>t.type==='expense'&&t.category===k).reduce((ss,t)=>ss+parseFloat(t.amount),0),0);
+      // desglose por categoría hija (Vivienda, Alimentación...)
+      const subs = NB_KEYS.map(k => ({
+        label: EXPENSE_CATEGORIES[k].label,
+        color: EXPENSE_CATEGORIES[k].color,
+        val: txs.filter(t=>t.type==='expense'&&t.category===k).reduce((s,t)=>s+parseFloat(t.amount),0)
+      }));
+      return { key:'NB', label:'Nec. básicas', color:'#7B8C9E', pct:40, real, budget:base*0.4, subs };
+    })()
   ];
+
   document.getElementById('budget-tbody').innerHTML = rows.map(r => {
     const rp = r.budget>0?(r.real/r.budget*100):0;
-    const ind = rp<=105?'✅':rp<=115?'⚠️':'❌';
     const bc = rp<=105?'var(--primary)':rp<=115?'var(--amber)':'var(--red)';
-    return `<tr><td><div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0"></div><span style="font-size:12px">${r.label}</span></div><div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(100,rp)}%;background:${bc}"></div></div></td><td class="mono" style="color:var(--text3)">${r.pct}%</td><td class="mono">${fmt(r.real)}</td><td style="text-align:right">${ind}</td></tr>`;
+    const open = expandedCats[r.key];
+    const chevron = `<svg class="cat-chevron${open?' open':''}" width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const mainRow = `<tr class="budget-row" onclick="toggleCat('${r.key}')">
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0"></div>
+          <span style="font-size:12px">${r.label}</span>
+          ${chevron}
+        </div>
+        <div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(100,rp)}%;background:${bc}"></div></div>
+        <div style="font-size:10px;color:${bc};margin-top:3px;font-family:'DM Mono',monospace">${r.budget>0?Math.round(rp)+'% gastado':'—'}</div>
+      </td>
+      <td class="mono" style="color:var(--text3)"><div>${r.pct}%</div><div style="font-size:10px;color:var(--text3)">${fmt(r.budget)}</div></td>
+      <td class="mono">${fmt(r.real)}</td>
+    </tr>`;
+
+    if (!open) return mainRow;
+
+    // fila desplegada con las subcategorías
+    const total = r.real;
+    const subCards = r.subs.map(s => {
+      const pct = total>0 ? Math.round(s.val/total*100) : 0;
+      return `<div class="sub-card">
+        <div class="sub-name">${s.label}</div>
+        <div class="sub-amount">${fmt(s.val)}</div>
+        <div class="sub-pct">${pct}% de la categoría</div>
+      </div>`;
+    }).join('');
+    const subRow = `<tr class="budget-subrow"><td colspan="3"><div class="sub-grid">${subCards}</div></td></tr>`;
+    return mainRow + subRow;
   }).join('');
 }
 
-function renderNBGrid(txs) {
-  const nbTotal = NB_KEYS.reduce((s,k)=>s+txs.filter(t=>t.type==='expense'&&t.category===k).reduce((ss,t)=>ss+parseFloat(t.amount),0),0);
-  document.getElementById('nb-grid').innerHTML = NB_KEYS.map(k => { const cat=EXPENSE_CATEGORIES[k]; const val=txs.filter(t=>t.type==='expense'&&t.category===k).reduce((s,t)=>s+parseFloat(t.amount),0); const pct=nbTotal>0?(val/nbTotal*100).toFixed(0):0; return `<div class="nb-item"><div class="nb-name">${cat.label}</div><div class="nb-amount">${fmt(val)}</div><div class="nb-pct">${pct}% de NB</div></div>`; }).join('');
+function toggleCat(key) {
+  expandedCats[key] = !expandedCats[key];
+  renderDashboard();
 }
 
 function renderRecentTx(txs) {
@@ -650,8 +740,9 @@ function openTxDetail(id) {
     ${t.description?`<tr><td style="color:var(--text3);padding:7px 0">Descripción</td><td style="text-align:right;padding:7px 0">${t.description}</td></tr>`:''}
   </table>`;
   document.getElementById('tx-modal').classList.add('show');
+  updateBackBtn();
 }
-function closeTxModal(e) { if (!e||e.target===document.getElementById('tx-modal')) { document.getElementById('tx-modal').classList.remove('show'); state.currentTxId=null; } }
+function closeTxModal(e) { if (!e||e.target===document.getElementById('tx-modal')) { document.getElementById('tx-modal').classList.remove('show'); state.currentTxId=null; updateBackBtn(); } }
 
 async function deleteCurrentTx() {
   if (!state.currentTxId) return;
@@ -726,8 +817,9 @@ function openAddRecurring() {
   document.getElementById('r-categoria').value='';
   document.getElementById('r-subcategoria').innerHTML='<option value="">Primero elige categoría...</option>';
   document.getElementById('recurring-modal').classList.add('show');
+  updateBackBtn();
 }
-function closeRecurringModal(e) { if (!e||e.target===document.getElementById('recurring-modal')) document.getElementById('recurring-modal').classList.remove('show'); }
+function closeRecurringModal(e) { if (!e||e.target===document.getElementById('recurring-modal')) { document.getElementById('recurring-modal').classList.remove('show'); updateBackBtn(); } }
 
 async function saveRecurring() {
   const name=document.getElementById('r-nombre').value, category=document.getElementById('r-categoria').value, subcategory=document.getElementById('r-subcategoria').value, amount=parseFloat(document.getElementById('r-importe').value), day_of_month=parseInt(document.getElementById('r-dia').value);
