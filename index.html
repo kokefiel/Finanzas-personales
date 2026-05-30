@@ -563,7 +563,15 @@ async function checkAndInsertRecurring() {
   const m = state.currentMonth, y = state.currentYear;
   const toInsert = [];
   state.recurring.filter(r => r.active).forEach(r => {
-    const exists = state.allTxs.some(t => t.recurring_id === r.id && t.month_number === m && t.year === y);
+    // Existe si hay una tx con el mismo recurring_id ESE mes/año,
+    // O un gasto equivalente (misma categoría+subcat+importe) ese mes/año aunque no tenga recurring_id
+    // (cubre datos importados del Excel que no traían recurring_id).
+    const exists = state.allTxs.some(t =>
+      t.month_number === m && t.year === y && (
+        t.recurring_id === r.id ||
+        (t.type === 'expense' && t.category === r.category && (t.subcategory||'') === (r.subcategory||'') && parseFloat(t.amount) === parseFloat(r.amount))
+      )
+    );
     if (!exists) {
       const d = new Date(y, m-1, r.day_of_month);
       toInsert.push(buildTxObj({ date: d.toISOString().split('T')[0], amount: r.amount, type: 'expense', category: r.category, subcategory: r.subcategory, description: `[Recurrente] ${r.name}`, recurring_id: r.id }));
