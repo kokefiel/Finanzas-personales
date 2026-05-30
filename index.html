@@ -304,6 +304,11 @@ html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-s
         <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="m11 11 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         <input type="search" class="search-input" id="h-search" placeholder="Buscar..." oninput="renderHistorial()">
       </div>
+      <div class="filter-bar" style="margin-bottom:8px">
+        <button class="filter-chip active" id="scope-mes" onclick="setScope(this,'mes')">Mes</button>
+        <button class="filter-chip" id="scope-anio" onclick="setScope(this,'anio')">Año</button>
+        <button class="filter-chip" id="scope-todo" onclick="setScope(this,'todo')">Todo</button>
+      </div>
       <div class="filter-bar">
         <button class="filter-chip active" onclick="setFilter(this,'all')">Todos</button>
         <button class="filter-chip" onclick="setFilter(this,'expense')">Gastos</button>
@@ -472,6 +477,7 @@ let state = {
   currentYear: new Date().getFullYear(),
   pickerYear: new Date().getFullYear(),
   filterTipo: 'all',
+  histScope: 'mes',
   currentTxId: null,
   allTxs: [],
   recurring: []
@@ -648,7 +654,11 @@ function selectMonth(m, y) {
   document.getElementById('currentMonthLabel').textContent = `${MONTHS_ES[m-1]} ${y}`;
   document.getElementById('anual-year').textContent = y;
   closeMonthPicker();
-  renderDashboard();
+  // Refresca la página activa según corresponda
+  if (currentPage === 'historial') renderHistorial();
+  else if (currentPage === 'balance') renderBalance();
+  else if (currentPage === 'anual') renderAnual();
+  else renderDashboard();
 }
 
 // ===================== DASHBOARD =====================
@@ -775,12 +785,28 @@ function setFilter(el, val) {
   renderHistorial();
 }
 
+function setScope(el, val) {
+  state.histScope = val;
+  el.closest('.filter-bar').querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  renderHistorial();
+}
+
 function renderHistorial() {
-  let txs = [...state.allTxs].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const scope = state.histScope;
+  let txs = state.allTxs.filter(t => {
+    if (scope === 'mes') return t.month_number===state.currentMonth && t.year===state.currentYear;
+    if (scope === 'anio') return t.year===state.currentYear;
+    return true; // todo
+  }).sort((a,b)=>new Date(b.date)-new Date(a.date));
   const search = (document.getElementById('h-search').value||'').toLowerCase();
   if (state.filterTipo !== 'all') txs = txs.filter(t=>t.type===state.filterTipo);
   if (search) txs = txs.filter(t => [(t.subcategory||''),(t.description||''),(t.income_source||'')].some(v=>v.toLowerCase().includes(search)));
-  document.getElementById('historial-list').innerHTML = txs.length ? txs.map(t=>txItemHtml(t)).join('') : '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Sin resultados</div></div>';
+  const scopeLabel = scope==='mes' ? `${MONTHS_ES[state.currentMonth-1]} ${state.currentYear}` : scope==='anio' ? `Año ${state.currentYear}` : 'Todo el histórico';
+  const totalGasto = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+parseFloat(t.amount),0);
+  const totalIng = txs.filter(t=>t.type==='income').reduce((s,t)=>s+parseFloat(t.amount),0);
+  const header = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px;color:var(--text3)"><span>${scopeLabel} · ${txs.length} mov.</span><span><span style="color:var(--green)">+${fmt(totalIng)}</span> · <span style="color:var(--red)">−${fmt(totalGasto)}</span></span></div>`;
+  document.getElementById('historial-list').innerHTML = header + (txs.length ? txs.map(t=>txItemHtml(t)).join('') : '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Sin movimientos</div></div>');
 }
 
 function txItemHtml(t) {
