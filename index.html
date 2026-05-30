@@ -341,6 +341,13 @@ html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-s
       <div class="anual-scroll"><table class="anual-table" id="anual-table"></table></div>
     </div>
 
+    <div id="page-categorias" class="page">
+      <div class="section-title" style="margin-bottom:6px">Subcategorías</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Personaliza las subcategorías de cada área de gasto. Borrar una no afecta a tus gastos ya registrados.</div>
+      <div class="form-group"><label class="form-label">Categoría</label><div class="form-select-wrap"><select class="form-select" id="cat-manage-select" onchange="renderSubcatManager()"></select></div></div>
+      <div id="subcat-manager"></div>
+    </div>
+
   </div>
 
   <nav class="bottom-nav">
@@ -373,6 +380,10 @@ html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-s
     <div class="more-item" onclick="navigate('anual');toggleMoreMenu()">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 2v3M11 2v3M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       Vista anual
+    </div>
+    <div class="more-item" onclick="navigate('categorias');toggleMoreMenu()">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Categorías
     </div>
   </div>
 
@@ -495,6 +506,33 @@ async function loadAllData() {
   const { data: rec } = await db.from('recurring_expenses').select('*');
   state.allTxs = txs || [];
   state.recurring = rec || [];
+  await loadSubcategories();
+}
+
+// Subcategorías personalizables: la tabla es la fuente de verdad tras la siembra inicial
+let customSubcats = {}; // { CATEGORY_KEY: [{id, label, sort_order}] }
+
+async function loadSubcategories() {
+  let { data } = await db.from('expense_subcategories').select('*').order('sort_order',{ascending:true});
+  // Primera vez: siembra las subcategorías base del código
+  if (!data || data.length === 0) {
+    const rows = [];
+    Object.keys(EXPENSE_CATEGORIES).forEach(k => {
+      (EXPENSE_CATEGORIES[k].subcategories||[]).forEach((s,i) => rows.push({ category_key:k, label:s, sort_order:i }));
+    });
+    if (rows.length) {
+      await db.from('expense_subcategories').insert(rows);
+      ({ data } = await db.from('expense_subcategories').select('*').order('sort_order',{ascending:true}));
+    }
+  }
+  customSubcats = {};
+  (data||[]).forEach(r => { (customSubcats[r.category_key] = customSubcats[r.category_key] || []).push({ id:r.id, label:r.label, sort_order:r.sort_order }); });
+}
+
+// Devuelve las subcategorías efectivas de una categoría (tabla, con fallback al código)
+function getSubcats(catKey) {
+  if (customSubcats[catKey] && customSubcats[catKey].length) return customSubcats[catKey].map(s=>s.label);
+  return (EXPENSE_CATEGORIES[catKey] && EXPENSE_CATEGORIES[catKey].subcategories) || [];
 }
 
 function populateCategorySelects() {
@@ -558,6 +596,7 @@ function navigate(page, isBack) {
   if (page === 'recurrentes') renderRecurrentes();
   if (page === 'balance') { balanceEditMode = false; const beb=document.getElementById('balance-edit-btn'); if(beb) beb.textContent='Editar'; renderBalance(); }
   if (page === 'anual') renderAnual();
+  if (page === 'categorias') initCatManager();
   if (page === 'nuevo') { setDefaultDates(); document.getElementById('g-importe').value=''; document.getElementById('i-importe').value=''; }
 }
 
@@ -789,13 +828,58 @@ function updateSubcats() {
   const k = document.getElementById('g-categoria').value;
   const sel = document.getElementById('g-subcategoria');
   if (!k||!EXPENSE_CATEGORIES[k]) { sel.innerHTML='<option value="">Primero elige área...</option>'; return; }
-  sel.innerHTML='<option value="">Selecciona subcategoría...</option>'+EXPENSE_CATEGORIES[k].subcategories.map(s=>`<option value="${s}">${s}</option>`).join('');
+  sel.innerHTML='<option value="">Selecciona subcategoría...</option>'+getSubcats(k).map(s=>`<option value="${s}">${s}</option>`).join('');
 }
 function updateRecurringSubcats() {
   const k = document.getElementById('r-categoria').value;
   const sel = document.getElementById('r-subcategoria');
   if (!k||!EXPENSE_CATEGORIES[k]) { sel.innerHTML='<option value="">Primero elige categoría...</option>'; return; }
-  sel.innerHTML='<option value="">Selecciona subcategoría...</option>'+EXPENSE_CATEGORIES[k].subcategories.map(s=>`<option value="${s}">${s}</option>`).join('');
+  sel.innerHTML='<option value="">Selecciona subcategoría...</option>'+getSubcats(k).map(s=>`<option value="${s}">${s}</option>`).join('');
+}
+
+// ---- Gestor de subcategorías ----
+function initCatManager() {
+  const sel = document.getElementById('cat-manage-select');
+  const keys = [...MAIN_CATS, ...NB_KEYS];
+  sel.innerHTML = keys.map(k=>`<option value="${k}">${EXPENSE_CATEGORIES[k].label}</option>`).join('');
+  renderSubcatManager();
+}
+
+function renderSubcatManager() {
+  const k = document.getElementById('cat-manage-select').value;
+  const cont = document.getElementById('subcat-manager');
+  const subs = customSubcats[k] && customSubcats[k].length ? customSubcats[k] : getSubcats(k).map(label=>({id:null,label}));
+  const rows = subs.map(s => `<div class="balance-row">
+      <input class="bal-edit-label" value="${escapeAttr(s.label)}" ${s.id?`onchange="renameSubcat('${s.id}', this.value)"`:'disabled'}>
+      ${s.id?`<button class="bal-del-btn" onclick="deleteSubcat('${s.id}','${escapeAttr(s.label)}')" title="Eliminar">✕</button>`:''}
+    </div>`).join('');
+  const addRow = `<div class="balance-row bal-add-row" onclick="addSubcat('${k}')"><span>+ Añadir subcategoría</span></div>`;
+  cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">${rows}${addRow}</div>`;
+}
+
+async function renameSubcat(id, label) {
+  label = (label||'').trim(); if (!label) return;
+  await db.from('expense_subcategories').update({ label }).eq('id', id);
+  await loadSubcategories();
+  showToast('✓ Subcategoría renombrada');
+}
+
+async function addSubcat(catKey) {
+  const label = prompt('Nombre de la nueva subcategoría:'); if (!label || !label.trim()) return;
+  const order = (customSubcats[catKey]||[]).length;
+  const { error } = await db.from('expense_subcategories').insert({ category_key:catKey, label:label.trim(), sort_order:order });
+  if (error) { showToast('⚠️ Ya existe o error'); return; }
+  await loadSubcategories();
+  renderSubcatManager();
+  showToast('✓ Subcategoría añadida');
+}
+
+async function deleteSubcat(id, label) {
+  if (!confirm(`¿Eliminar "${label}"? Tus gastos ya registrados con esta subcategoría no se borran ni cambian; solo deja de aparecer al crear gastos nuevos.`)) return;
+  await db.from('expense_subcategories').delete().eq('id', id);
+  await loadSubcategories();
+  renderSubcatManager();
+  showToast('✓ Subcategoría eliminada');
 }
 
 async function saveTransaction(type) {
