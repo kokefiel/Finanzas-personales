@@ -1001,7 +1001,7 @@ async function renderBalance() {
           <button class="bal-del-btn" onclick="deleteField('${f.id}','${escapeAttr(f.field_label)}')" title="Eliminar activo">✕</button>
         </div>`;
       }
-      return `<div class="balance-row"><span class="balance-row-label">${f.field_label}</span><input class="balance-input" type="number" value="${monthData[f.field_key]||''}" placeholder="0" step="0.01" data-field="${f.field_key}" data-liab="${isLiability?1:0}" onchange="saveBalanceField(this)"></div>`;
+      return `<div class="balance-row"><span class="balance-row-label">${f.field_label}</span><input class="balance-input" type="number" value="${monthData[f.field_key]||''}" placeholder="0" step="0.01" data-field="${f.field_key}" data-group="${group.group_key}" data-liab="${isLiability?1:0}" onchange="saveBalanceField(this)"></div>`;
     }).join('');
 
     const addRowHtml = balanceEditMode
@@ -1099,13 +1099,14 @@ function saveBalanceField(input) {
   balanceDebounce[field] = setTimeout(async () => {
     const val = parseFloat(input.value)||0;
     const fieldLabel = input.closest('.balance-row').querySelector('.balance-row-label').textContent;
-    const payload = { month_number: state.currentMonth, year: state.currentYear, field_key: field, field_label: fieldLabel, amount: val };
+    const fieldGroup = input.dataset.group || '';
+    const payload = { month_number: state.currentMonth, year: state.currentYear, field_key: field, field_label: fieldLabel, field_group: fieldGroup, amount: val };
     let { error } = await db.from('balance_entries').upsert(payload, { onConflict: 'month_number,year,field_key' });
     // Fallback: si el upsert falla (p.ej. falta la restricción UNIQUE), hacemos update manual o insert
     if (error) {
       const { data: existing } = await db.from('balance_entries').select('id').eq('month_number', state.currentMonth).eq('year', state.currentYear).eq('field_key', field);
       if (existing && existing.length) {
-        ({ error } = await db.from('balance_entries').update({ amount: val, field_label: fieldLabel }).eq('id', existing[0].id));
+        ({ error } = await db.from('balance_entries').update({ amount: val, field_label: fieldLabel, field_group: fieldGroup }).eq('id', existing[0].id));
       } else {
         ({ error } = await db.from('balance_entries').insert(payload));
       }
