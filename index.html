@@ -105,7 +105,9 @@ html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-s
 .checkbox-row label { font-size: 14px; cursor: pointer; flex: 1; }
 .warn-badge { font-size: 11px; background: var(--red-light); color: var(--red); padding: 2px 7px; border-radius: 20px; font-weight: 500; }
 
-.tx-item { background: var(--white); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; border: 1px solid var(--border); margin-bottom: 6px; transition: background 0.1s; }
+.tx-item { background: var(--white); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; border: 1px solid var(--border); border-left-width: 4px; margin-bottom: 6px; transition: background 0.1s; }
+.tx-item.income { border-left-color: var(--green); }
+.tx-item.expense { border-left-color: var(--red); }
 .tx-item:active { background: var(--bg2); }
 .tx-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; font-weight: 600; }
 .tx-info { flex: 1; min-width: 0; }
@@ -113,6 +115,7 @@ html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-s
 .tx-meta { font-size: 12px; color: var(--text3); margin-top: 1px; }
 .tx-amount { font-size: 15px; font-weight: 600; font-family: 'DM Mono', monospace; letter-spacing: -0.3px; }
 .tx-amount.income { color: var(--green); }
+.tx-amount.expense { color: var(--red); }
 
 .filter-bar { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 2px; }
 .filter-bar::-webkit-scrollbar { display: none; }
@@ -775,16 +778,17 @@ function renderHistorial() {
 function txItemHtml(t) {
   const cat = t.type==='income' ? null : EXPENSE_CATEGORIES[t.category];
   const label = t.type==='income' ? (t.income_source||'Ingreso') : (t.subcategory||(cat?cat.label:t.category));
-  const color = t.type==='income' ? 'var(--green-light)' : (cat?cat.color+'20':'var(--bg2)');
-  const iconColor = t.type==='income' ? 'var(--green)' : (cat?cat.color:'var(--text3)');
+  const isIncome = t.type==='income';
+  const sideColor = isIncome ? 'var(--green)' : 'var(--red)';
+  const iconBg = isIncome ? 'var(--green-light)' : 'var(--red-light)';
   const dateStr = t.date ? t.date.split('-').reverse().join('/') : '';
-  return `<div class="tx-item" onclick="openTxDetail('${t.id}')">
-    <div class="tx-icon" style="background:${color};color:${iconColor}">${t.type==='income'?'↑':'↓'}</div>
+  return `<div class="tx-item ${t.type}" onclick="openTxDetail('${t.id}')">
+    <div class="tx-icon" style="background:${iconBg};color:${sideColor}">${isIncome?'↑':'↓'}</div>
     <div class="tx-info">
       <div class="tx-name">${label}${t.description?` · ${t.description}`:''}</div>
-      <div class="tx-meta">${cat?cat.label:''} · ${dateStr}</div>
+      <div class="tx-meta">${cat?cat.label:'Ingreso'} · ${dateStr}</div>
     </div>
-    <div class="tx-amount ${t.type}">${t.type==='income'?'+':'−'}${fmt(parseFloat(t.amount))}</div>
+    <div class="tx-amount ${t.type}">${isIncome?'+':'−'}${fmt(parseFloat(t.amount))}</div>
   </div>`;
 }
 
