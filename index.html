@@ -1094,11 +1094,31 @@ let balanceDebounce = {};
 function saveBalanceField(input) {
   const field = input.dataset.field;
   clearTimeout(balanceDebounce[field]);
+  // feedback visual inmediato: borde amarillo mientras guarda
+  input.style.borderColor = 'var(--amber)';
   balanceDebounce[field] = setTimeout(async () => {
     const val = parseFloat(input.value)||0;
     const fieldLabel = input.closest('.balance-row').querySelector('.balance-row-label').textContent;
-    await db.from('balance_entries').upsert({ month_number: state.currentMonth, year: state.currentYear, field_key: field, field_label: fieldLabel, amount: val }, { onConflict: 'month_number,year,field_key' });
-    updateBalanceTotals();
+    const payload = { month_number: state.currentMonth, year: state.currentYear, field_key: field, field_label: fieldLabel, amount: val };
+    let { error } = await db.from('balance_entries').upsert(payload, { onConflict: 'month_number,year,field_key' });
+    // Fallback: si el upsert falla (p.ej. falta la restricción UNIQUE), hacemos update manual o insert
+    if (error) {
+      const { data: existing } = await db.from('balance_entries').select('id').eq('month_number', state.currentMonth).eq('year', state.currentYear).eq('field_key', field);
+      if (existing && existing.length) {
+        ({ error } = await db.from('balance_entries').update({ amount: val, field_label: fieldLabel }).eq('id', existing[0].id));
+      } else {
+        ({ error } = await db.from('balance_entries').insert(payload));
+      }
+    }
+    if (error) {
+      input.style.borderColor = 'var(--red)';
+      console.error('Error guardando balance:', error);
+      showToast('⚠️ Error al guardar: ' + (error.message||error.code||'desconocido'));
+    } else {
+      input.style.borderColor = 'var(--primary)';
+      setTimeout(()=>{ input.style.borderColor=''; }, 1200);
+      updateBalanceTotals();
+    }
   }, 800);
 }
 
